@@ -14,14 +14,13 @@ db.connect
     app.get("/check", (req, res) => {
       res.send("OK");
     });
-    app.listen(port, () =>
+    app.listen(port, () => {
+      console.log(`Demo app listening on port ${port}!`);
       db.Logs.insertOrUpdate({
         author: process.env.AUTHOR,
         container_id: process.env.HOSTNAME
-      }).then(() => {
-        console.log(`Demo app listening on port ${port}!`);
-      })
-    );
+      });
+    });
   })
   .catch(e => {
     console.error("Server Crash with error", e);

@@ -12,7 +12,7 @@ db.Sequelize = Sequelize;
 db.Logs = db.sequelize.import("./models/logs.model");
 
 db.connect = connectWithRetry(sequelize, 1000).then(() => {
-  sequelize.sync().then(() => {
+  return sequelize.sync().then(() => {
     console.log("DB Synced - Connected");
     return sequelize.authenticate();
   });
