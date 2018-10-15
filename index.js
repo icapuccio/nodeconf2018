@@ -5,9 +5,10 @@ const port = 80;
 
 db.connect
   .then(() => {
-    app.get("/", (req, res) => {
+    app.get("/:user/*", (req, res) => {
+      const { user } = req.params;
       db.Logs.findAll().then(logs => {
-        res.json(logs);
+        res.json({ user, logs });
       });
     });
     app.get("/check", (req, res) => {
