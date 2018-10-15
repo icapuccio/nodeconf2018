@@ -1,0 +1,21 @@
+version: "2"
+services:
+  server:
+    env_file: .env
+    build: .
+    depends_on:
+      - db
+    links:
+      - db
+    ports:
+      - "8090:80"
+    image: nodeconf-server
+  db:
+    image: postgres:10.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: docker
+      POSTGRES_PASSWORD: docker
+    expose:
+      - "5432"
