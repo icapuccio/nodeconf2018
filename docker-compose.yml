@@ -2,6 +2,8 @@ version: "2"
 services:
   server:
     env_file: .env
+    environment:
+      - DB_URL=postgres://docker:docker@db/docker
     build: .
     depends_on:
       - db
