@@ -79,7 +79,7 @@ Note: If you receive an "Unknown options: --no-include-email" error when using t
 - Task definition: nodeconf-server-usuariox
 - Container name: nodeconf-server-container-usuariox
 - Environment variables:
-    - DB_URL=postgres://kelsus:kelsus123@grupo-n.c87dwxbbq8mu.us-west-1.rds.amazonaws.com/nodeconf
+    - DB_URL=postgres://kelsus:kelsus123@grupo-n.cr3njupv44fo.us-east-1.rds.amazonaws.com/nodeconf
     - AUTHOR=tu-nombre
 - Service: nodeconf-server-service-usuariox
 
