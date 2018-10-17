@@ -30,7 +30,7 @@ and your `~/.aws/config` file has a section that looks like this (notice the "pr
 
 ```
 [profile nodeconf]
-region = us-west-1
+region = us-east-1
 ```
 
 If you have both files correctly configured and you are still getting an error, make sure your token is valid by running:
