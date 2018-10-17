@@ -46,10 +46,10 @@ Ensure you have installed the latest version of the AWS CLI and Docker. For more
 1) Retrieve the login command to use to authenticate your Docker client to your registry.
 For macOS or Linux systems, use the AWS CLI:
 
-    `$(aws ecr get-login --no-include-email --region us-west-1)`
+    `$(aws ecr get-login --no-include-email --region us-east-1)`
 
 For Windows systems, use AWS Tools for PowerShell:
-Invoke-Expression -Command (Get-ECRLoginCommand -Region us-west-1).Command
+Invoke-Expression -Command (Get-ECRLoginCommand -Region us-east-1).Command
 
 Note: If you receive an "Unknown options: --no-include-email" error when using the AWS CLI, ensure that you have the latest version installed. Learn more
 
@@ -61,8 +61,36 @@ Note: If you receive an "Unknown options: --no-include-email" error when using t
 
 4) After the build completes, tag your image so you can push the image to this repository:
 
-    `docker tag nodeconf-server:latest 398398166530.dkr.ecr.us-west-1.amazonaws.com/nodeconf-server:1.0.0`
+    `docker tag nodeconf-server:latest 398398166530.dkr.ecr.us-east-1.amazonaws.com/nodeconf-server:1.0.0`
 
 5) Run the following command to push this image to your newly created AWS repository:
 
-    `docker push 398398166530.dkr.ecr.us-west-1.amazonaws.com/nodeconf-server:1.0.0`
+    `docker push 398398166530.dkr.ecr.us-east-1.amazonaws.com/nodeconf-server:1.0.0`
+   
+### Valores a usar en el workshop   
+
+#### Si tu usuario es "x", tus links y nombres a usar son:
+- Usuario x
+- AWS console login: https://kelsusinc.signin.aws.amazon.com/console
+- AWS user: nodeconfx
+- AWS pass: kelsus@nodeconf2018
+- Target group: nodeconf-server-usuariox
+- Log group: nodeconf-server/usuariox
+- Task definition: nodeconf-server-usuariox
+- Container name: nodeconf-server-container-usuariox
+- Environment variables:
+    - DB_URL=postgres://kelsus:kelsus123@grupo-n.c87dwxbbq8mu.us-west-1.rds.amazonaws.com/nodeconf
+    - AUTHOR=tu-nombre
+- Service: nodeconf-server-service-usuariox
+
+#### Si tu grupo es "n", tus links y nombres a usar son:
+- Grupo n
+- DB Identifier: grupo-n
+- DB Endpoint: grupo-n.cr3njupv44fo.us-east-1.rds.amazonaws.com
+- Load Balancer: nodeconf-grupo-n
+- Cluster: grupo-n
+
+### Para consultas una vez finalizado el workshop:
+https://prodockertraining.com/contacto-desarrollador/
+
+
