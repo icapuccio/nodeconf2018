@@ -67,7 +67,7 @@ Note: If you receive an "Unknown options: --no-include-email" error when using t
 
     `docker push 398398166530.dkr.ecr.us-east-1.amazonaws.com/nodeconf-server:1.0.0`
    
-### Valores a usar en el workshop   
+## Valores a usar en el workshop   
 
 #### Si tu usuario es "x", tus links y nombres a usar son:
 - Usuario x
@@ -90,7 +90,7 @@ Note: If you receive an "Unknown options: --no-include-email" error when using t
 - Load Balancer: nodeconf-grupo-n
 - Cluster: grupo-n
 
-### Para consultas una vez finalizado el workshop:
+## Para consultas una vez finalizado el workshop:
 https://prodockertraining.com/contacto-desarrollador/
 
 
