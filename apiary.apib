@@ -1,0 +1,2872 @@
+FORMAT: 1A
+
+# Zona Matriculados API
+
+¡Bienvenido a Zona Matriculados! En esta documentación encontrarás
+toda la información necesaria para consumir los recursos de la API de
+Zona Matriculados de Camuzzi.
+
+# General
+
+Toda intercambio de información con la API es enviado y recibido como JSON.
+El acceso a la API se encuentra disponible en los siguientes entornos:
+
+|  Ambiente  | URL Base                                                  |
+|------------|----------------------------------------------------------:|
+| Apiary     | https://private-8efba-camuzzimatriculados.apiary-mock.com |
+| Desarrollo | http://52.168.145.253:101                                 |
+| QA         | http://52.168.145.160:101                                 |
+| Stage      | http://137.135.93.5:5011                                  |
+| Producción | TBD                                                       |
+
+## Requests
+
+Todos los servicios de la API son descritos por medio de un método 
+HTTP (ej: GET, POST, PUT, DELETE) y la URI delclient endpoint. Por ejemplo:
+
+    `GET /Users/{UserId}/Forms`
+
+Los parámetros que van en la URI están rodeados por llaves `{}` 
+y son siempre requeridos. La URL de arriba por ejemplo, requiere que se 
+le especifique un `{UserId}`.
+
+Si es necesario enviar información adicional (ej: para crear un usuario)
+la misma debe ser enviada en el request body como un objeto JSON y el
+header `Content-Type: application/json` debe estar presente.
+
+## Responses
+
+Las respuestas son retornadas siempre en formato JSON; toda respuesta 
+tendrá el header `Content-Type: application/json` presente.
+
+Todos los timestamps son retornados en formato 
+[ISO 8601](https://www.w3.org/TR/NOTE-datetime), `YYYY-MM-DDTHH:MM:SSZ`.
+
+### Response Status
+
+Todas las respuestas de la API usan un status code HTTP estándar.
+Algúnos status code comunes que se encontrarán usando la API son:
+
+* `200` `OK` - El request se completó de forma satisfactoria.
+* `400` `Bad Request` - El request no está bien formulado, es sintácticamente incorrecto o no cumple con el esquema del endpoint.
+* `401` `Unauthorized` - La autenticación del llamado no resultó satisfactoria.
+* `404` `Not Found` - El recurso solicitado no se encontró.
+* `422` `Unprocessable Entity` - La API no pudo completar la acción solicitada, la acción solicitada es semánticamente incorrecta o falló una validación de negocio.
+* `5XX` `Server Error` - Algo salió mal del lado del servidor. Seguramente un inconveniente transitorio, pero si obtenés repetidos errores 5XX, por favor solicitar soporte.
+
+# Group a. Autenticación de Aplicación
+
+## Sesiones [/Token]
+### a1. Generar [POST]
+
+Intercambio de credenciales de la aplicación Zona Matriculados
+por un `Token`, el cual tiene una determinada expiración expresada
+en segundos dentro del atributo `Expiracion`. Este `Token` será 
+requerido para autenticar todos los requests que se hagan desde la 
+aplicación a los recursos de la API de Camuzzi.
+    
++ Request (application/json)
+
+        {
+            "ApiKey": "ZonaMatriculados",
+            "ApiSecret": "cfRtgh4j5hje25jtg9g95jgDFG"
+        }
+    
++ Response 200 (application/json)
+
+        {
+            "Token": "eylNcNzsCyHJCVBv7vrmJTk4aeKpx1ABSU83rtsdf42H",
+            "Expiration": 86399
+        }
+
++ Response 401 (application/json)
+
+        {
+            "Message": "Credenciales inválidas"
+        }
+
+# Group b. Registración de Usuarios
+
+## Identificación de Usuario [/Users/Identification]
+
+La primer validación que se hará durante el proceso de registración
+es verificar que el email con el que desea registrarse el usuario 
+esté disponible, es decir, que no exista ningún otro usuario con el
+mismo email. Además, el mismo debe validarse contra un servicio externo
+que permita asegurar que es un email válido (existe el dominio).
+
+### b1. Verificar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Email": "juan_perez@example.com"
+            }
+
++ Response 200
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Email": "email_existente@example.com"
+            }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "El correo ingresado ya se encuentra registrado. Inicie Sesión o si no recuerda su contraseña ingrese en la opción correspondiente para recuperarla."
+        }
+        
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Email": "juan_perez@jmail.com"
+            }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "El correo ingresado es inexistente. Por favor, verifique y vuelva a ingresarlo."
+        }
+
+## Preguntas de validación de identidad [/Users/Identity/Questions]
+
+Una vez que el usuario ingresó su documento, se consume este servicio 
+con el fin de obtener un set de preguntas de validación de identidad,
+que se obtendrán de un servicio externo.
+
+Se deberá ejecutar una validación en primer instancia que verifique
+que el tipo y número de documento enviados sean válidos, es decir,
+que exista un matriculado en los sistemas de Camuzzi que aún no posea 
+usuario asociado en la plataforma.
+
+### b2. Generar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "DocumentType": "DNI",
+                "DocumentNumber": 20123456,
+                "Gender": "M"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Identification": {
+                "DocumentType": "DNI",
+                "DocumentNumber": 20123456,
+                "Gender": "M",
+                "Name": "JUAN",
+                "LastName": "PEREZ"
+            },
+            "QuestionsHeader": {
+                "Provider": "Equifax",
+                "QuestionsId": 201807100816602,
+                "Questions": [
+                    {
+                        "Id": 1,
+                        "Question": "Esta o estuvo alguna vez relacionado con",
+                        "Options": {
+                            "0": "Ninguno de los anteriores",
+                            "1": "VILLARREAL,IRMA",
+                            "2": "IUQUICH,IRMA",
+                            "3": "URUENA,IRMA",
+                            "4": "MAIER ETIT,IRMA"
+                        },
+                        "FieldType": "radio",
+                        "Order": 1,
+                        "ErrorMessage": null
+                    },
+                    {
+                        "Id": 2,
+                        "Question": "Tiene una tarjeta de credito de BANCO CIUDAD DE BUENOS AIRES",
+                        "Options": {
+                            "1": "Si",
+                            "2": "No"
+                        },
+                        "FieldType": "radio",
+                        "Order": 2,
+                        "ErrorMessage": null
+                    },
+                    {
+                        "Id": 3,
+                        "Question": "Has trabajado o vivido en alguna de las siguientes alturas",
+                        "Options": {
+                            "0": "Ninguno de los anteriores",
+                            "1": "300",
+                            "2": "400",
+                            "3": "500",
+                            "4": "200"
+                        },
+                        "FieldType": "radio",
+                        "Order": 3,
+                        "ErrorMessage": null
+                    },
+                    {
+                        "Id": 4,
+                        "Question": "Alguno de los siguientes telefonos le resulta familiar",
+                        "Options": {
+                            "0": "Ninguno de los anteriores",
+                            "1": "02994330783"
+                        },
+                        "FieldType": "radio",
+                        "Order": 4,
+                        "ErrorMessage": null
+                    }
+                ]
+            }
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "El documento ingresado no corresponde a ningún matriculado registrado en Camuzzi."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "El documento ingresado ya está en uso. Si no recuerda sus credenciales vaya a la sección correspondiente para recuperarlas."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "No pudimos obtener los datos de su perfil. Por favor contáctese con el call center para poder continuar."        
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Documento bloqueado por múltiples intentos fallidos. Por favor comuníquese con el call center para poder continuar."        
+        }
+
+## Respuestas de validación de identidad [/Users/Identity/Answers]
+
+El usuario responde las preguntas de validación y envía las respuestas 
+para su verificación en el servicio externo que proveyó las preguntas. 
+En caso satisfactorio se retornar un mensaje y el número de documento 
+asociado a la validación.
+
+### b3. Enviar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Provider":"Equifax",
+                "QuestionsId": 201807100816602,
+                "Answers": [
+                    {
+                        "QuestionId": 1,
+                        "AnswerOptionId": 2,
+                        "Value": "IUQUICH,IRMA"
+                    },
+                    {
+                        "QuestionId": 2,
+                        "AnswerOptionId": 1,
+                        "Value": "Si"
+                    },
+                    {
+                        "QuestionId": 3,
+                        "AnswerOptionId": 0,
+                        "Value": "Ninguno de los anteriores"
+                    },
+                    {
+                        "QuestionId": 4,
+                        "AnswerOptionId": 1,
+                        "Value": "02994330783"
+                    }
+                ]
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Verificación exitosa.",
+            "DocumentNumber": "20123456"
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Respuestas incorrectas."
+        }
+
+## Registro [/Users/Register]
+
+Crea un nuevo usuario con los datos requeridos en el proceso de 
+registración. Se retorna un identificador unívoco del usuario creado.
+
+### b4. Generar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "Email": "juan_perez@example.com",
+                "Password": "12345678aA",
+                "DocumentType": "DNI",
+                "DocumentNumber": "20123456",
+                "Gender": "M",
+                "Phone": {
+                    "AreaCode": "11",
+                    "Number": "45675788",
+                    "Type": "CELULAR"
+                },
+                "Confirmed": false
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Id": "102030"
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "Usuario ya registrado."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Error al recuperar datos del Matriculado."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "Error al crear Matriculado."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Error al crear Usuario."
+        }
+        
+## Email de registración [/Users/Register/Email]
+
+Cuando un usuario nuevo se registra en la plataforma, el mismo debe
+confirmarse antes de poder operar. Para esto se consumirá este 
+servicio para que se le envíe al usuario un correo electrónico con el 
+link de confirmación para validar que el email con el que se registró 
+es correcto. 
+
+Este servicio se consumirá también cuando el usuario solicite que se
+le reenvíe el correo de confirmación.
+
+### b5. Enviar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+              "Email": "juan_perez@example.com",
+              "Link": "https://matriculados.camuzzigas.com.ar/signup/email/confirm?confirmation_token=e371010a75eb0e634fec"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Hemos enviado un email a la casilla juan_perez@example.com con el link para confirmar su usuario."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario no registrado. Por favor verifique el correo electrónico ingresado."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "Ocurrió un error al enviar el correo electrónico de validación. Por favor, intente nuevamente más tarde."
+        }
+
+## Confirmación de registración [/Users/{UserId}/Confirmation]
+
+Luego de la correcta validación del correo electrónico a través
+del link de verificación, se consume este servicio para confirmar 
+la registración del usuario.
+
+### b6. Confirmar [POST]
+
++ Parameters
+    + UserId: `102030` (string, required) - ID del usuario.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "Usuario ya confirmado."
+        }
+
+# Group c. Recuperación de Usuario y Contraseña
+
+## Recuperación de usuario [/Users/Recovery{?DocumentType,DocumentNumber,Gender}]
+
+### c1. Obtener Pista [GET]
+
+Cuando un usuario no recuerda el email con el que se registró, ingresa 
+su documento y se consume este servicio para obtener una pista del 
+email asociado al mismo.
+
++ Parameters
+    + DocumentType: `DNI` (enum[string], required) - Tipo de documento del usuario.
+        + Members
+            + `CID`
+            + `DNI`
+            + `LCI`
+            + `LEN`
+            + `PSP`
+            + `DNR`
+            + `CUI`
+    + DocumentNumber: `20123456` (string, required) - Número de documento del usuario.
+    + Gender: `M` (enum[string], optional) - Sexo del usuario.
+        + Members
+            + `M`
+            + `F`
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Email": "j***@example.com",
+            "Id": "102030"
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario no registrado. Por favor verifique los datos ingresados."
+        }
+
+### c2. Validar [POST]
+
+Una vez obtenida la pista se envía el `UserId` recuperado 
+anteriormente, junto con el email ingresado por el usuario para
+verificar si ambos datos se corresponden.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "Email": "juan_perez@example.com",
+                "Id": "102030"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "El email es correcto."
+        }
+        
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "Email": "juan_gomez@example.com",
+                "Id": "102030"
+            }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "El email que estas intentando recordar no existe."
+        }
+
+## Email de recuperación de contraseña [/Users/PasswordRecovery/Email]
+
+### c3. Enviar [POST]
+
+Cuando un usuario conoce su email, pero no recuerda su contraseña, 
+se consume este servicio para que se le envíe un correo electrónico 
+con el link al cual debe ingresar para establecer una nueva contraseña.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+              "Email": "juan_perez@example.com",
+              "Link": "https://matriculados.camuzzigas.com.ar/signin/change_password?reset_password_token=JGhh-u4_e4e6n6xCNWps"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Hemos enviado un email a la casilla juan_perez@example.com con las instrucciones para la recuperación de su contraseña."
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario no registrado. Por favor verifique el correo electrónico ingresado."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Ocurrió un error al enviar el correo electrónico de recuperación. Por favor, intente nuevamente más tarde."
+        }
+
+## Nueva contraseña por recuperación [/Users/{UserId}/PasswordRecovery]
+
+### c4. Generar [POST]
+
+Luego de que el usuario ingresa en el link de recuperación de
+contraseña y se valida la nueva contraseña elegida, se invoca este
+servicio para reemplazar la contraseña actual.
+
++ Parameters
+    + UserId: `102030` (string, required) - ID del usuario.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "Password": "Aa87654321"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Su contraseña fue actualizada correctamente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "La contraseña no cumple los requerimientos necesarios."
+        }
+
+# Group d. Autenticación de Usuarios
+
+## Login [/Users/Login]
+
+Cuando un usuario quiere loguearse a la plataforma, sus credenciales 
+(`Email` y `Password`) son validadas para verificar su autenticidad. 
+Se retorna el identificador unívoco del usuario y un flag indicando si
+el mismo está confirmado o no.
+
+### d1. Ingresar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "Email": "juan_perez@example.com",
+                "Password": "12345678aA"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Id": "102030",
+            "Confirmed": true
+        }
+        
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "Email": "juan_perez@example.com",
+                "Password": "abcdefg"
+            }
+
++ Response 401 (application/json)
+
+        {
+            "Message": "Credenciales inválidas"
+        }
+
+## Existencia de usuario [/Users/Email{?Email}]
+
+Cuando un usuario quiere loguearse o recuperar contraseña en la 
+plataforma, se debe verificar si el mismo es un usuario actual 
+en caso de que el mismo no esté sincronizado en la plataforma.
+
+### d2. Obtener [GET]
+
++ Parameters
+    + Email: `juan_perez@example.com` (string, required) - Email del usuario.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
++ Response  200 (application/json)
+
+        {
+            "Id": "102030",
+            "Email": "juan_perez@example.com",
+            "Confirmed": true
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+
+
+# Group e. Usuarios
+
+## Perfil [/Users/{UserId}]
+
+Gestión de los datos de perfil del usuario. Los valores posibles para
+Tipo de teléfono serán: `FIJO` o `MOVIL`.
+
+### e1. Mostrar [GET]
+
++ Parameters
+    + UserId: `102030` (string, required) - ID del Usuario.
+    
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+        {
+            "Email": "juan_perez@example.com",
+            "Name": "JUAN",
+            "LastName": "PEREZ",
+            "DocumentType": "DNI",
+            "DocumentNumber": "20123456",
+            "Gender": "M",
+            "Address": "Gorriti 674",
+            "City": "Balcarce",
+            "AttentionCenter": "La Loma, Tolosa",
+            "Category": "Primera",
+            "StartDateActivity": "2006-03-29T00:00:00-03:00",
+            "LicenseNumber": "MP. 200339",
+            "LicenseStatus": "Pendiente de pago",
+            "ActiveLicense": true,
+            "ShowLicenseStatusAlert": true,
+            "CanStartWorkflow": true,
+            "CanEditWorkflow": true,
+            "Phone": {
+                "AreaCode": "11",
+                "Number": "45675788",
+                "Type": "FIJO"
+            },
+            "Confirmed": true
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+
+### e2. Actualizar [PUT]
+
++ Parameters
+    + UserId: `102030` (string, required) - ID del Usuario.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "Phone": {
+                    "AreaCode": "11",
+                    "Number": "44475788",
+                    "Type": "FIJO"
+                }
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Su perfil se actualizó correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+        
+## Contraseña [/Users/{UserId}/Password]
+
+Gestión de la contraseña del usuario. La misma se puede modificar
+por elección del usuario, o bien ante la recuperación de la misma.
+
+### e3. Actualizar [PUT]
+
++ Parameters
+    + UserId: `102030` (string, required) - ID del Usuario.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "ActualPassword": "12345678aA",
+                "NewPassword": "Aa87654321"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Su contraseña fue actualizada correctamente."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "La contraseña actual es incorrecta."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "La nueva contraseña no cumple con los requisitos."
+        }
+
+## Dashboard [/Users/{UserId}/Dashboard]
+
+Servicio destinado a obtener los datos de la pantalla principal del usuario.
+
+### e4. Mostrar [GET]
+    
++ Request
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Email": "juan_perez@example.com",
+            "Name": "JUAN",
+            "LastName": "PEREZ",
+            "InProgressWorkflowsKPI": 10,
+            "RejectedObservedWorkflowsKPI": 3,
+            "CompletedWorkflowsKPI": 4,
+            "HomeImprovementWorkflowsKPI": 2,
+            "LicenseData": {
+                "LicenseNumber": "MP. 200339",
+                "LicenseStatus": "Pendiente de pago",
+                "ShowLicenseStatusAlert": true,
+                "LicenseStatusAlertMessage": "Recuerde acercarse a nuestra oficina de 08 a 15hs para abonar la tarifa.",
+                "LicensePayable": true,
+                "LicenseExpirationDate": "2019-03-29T14:20:55-03:00",
+                "LicenseAmount": 500.03
+            }
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+
+## Preferencias de notificación [/Users/{UserId}/Notifications/Preferences]
+
+Configuración de las preferencias de notificaciones para un usuario.
+
+### e5. Listar [GET]
+
++ Parameters
+    + UserId (string) - ID de Usuario
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Channels": [
+                {
+                    "Channel": "Email",
+                    "Preferences": {
+                        "UserLicense": true,
+                        "UserWorkflows": true
+                    }
+                }
+            ]
+        }
+
+### e6. Actualizar [PUT]
+
++ Parameters
+    + UserId (string) - ID de Usuario
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Channels": [
+                    {
+                        "Channel": "Email",
+                        "Preferences": {
+                            "UserLicense": true,
+                            "UserWorkflows": false
+                        }
+                    }
+                ]
+            }
+
++ Response 200 (application/json)
+
+## Petición de cambio y Actualización de Email [/Users/{UserId}/Email]
+
+### e7. Petición de cambio de Email [POST]
+
+Se invoca este servicio cuando el usuario desea modificar su email. 
+Debe validarse que no exista otro usuario con el email solicitado. En
+caso que el email esté disponible, se envía un correo al nuevo email 
+del usuario con el link de confirmación.
+
++ Parameters
+    + UserId (string) - ID de Usuario
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "NewEmail": "juan_perez@example.com",
+                "ConfirmationLink": "https://matriculados.camuzzigas.com.ar/users/change_email/confirm?confirmation_token=MtMkkl-xvtsV4KtBxrR9"
+            }
+            
++ Response 200 (application/json)
+
+        {
+            "Message": "Mail de confirmación enviado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Email tomado."
+        }
+        
+### e8. Actualización de Email [PUT]
+
+Se invoca este servicio cuando el usuario quiere confirmar el cambio 
+de email. Debe validarse que no exista otro usuario con el email 
+solicitado. En caso que el email esté disponible, se envía realiza la 
+actualización del email en la base de datos y el usuario ya debe poder 
+loguearse con el nuevo email.
+
++ Parameters
+    + UserId (string) - ID de Usuario
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "NewEmail": "juan_perez@example.com"
+            }
+            
++ Response 200 (application/json)
+
+        {
+            "Message": "Email actualizado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Email tomado."
+        }
+
+# Group f. Trámites
+
+## Validar flujo de trámite [/Workflows/Validate]
+
+### f0. Validar [POST]
+
+En los primeros pasos del flujo de creación del trámite se cargan ciertos datos 
+que buscan ser validados.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: JWT
+
+    + Body
+
+            {
+                "UserId": "102030",
+                "WorkflowType": "Formulario_3_4",
+                "WorkflowId": "123456",
+                "HeaderData": {
+                    "WorkflowType": "Nuevo",
+                    "OwnerCuit": 20335321234,
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerStreetType": "CA.",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerAnnex": "Anexo 2",
+                    "OwnerCity": "001",
+                    "HomeImprovementProject": true
+                }
+            }
+            
++ Response 200 (application/json)
+
+        {
+            "Message": "Trámite válido."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo generar su trámite debido a XXX."
+        }
+
+## Listado de trámites [/Workflows{?BackofficeUserId,UserId,WorkflowId,WorkflowType,ProjectNumber,HomeImprovementProject,OwnerName,OwnerDocumentType,OwnerDocumentNumber,OwnerAddress,OwnerCity,Status,StatusGroup,Statuses,MainPipe,SupplyPossibility,Page,PageSize,OrderBy,OrderSort}]
+
+Alta y listado de trámites asociados a un usuario.
+
+Valores posibles para `Status`: `Borrador`, `Enviado`, `EnRevision`, 
+`Observado`, `Rechazado`, `NoInspeccionado`, `Aprobado`, `Cancelado`, 
+`AprobadoPorCliente`, `RechazadoPorCliente`, `Asignado`, `Visitado`
+
+Valores posibles para `WorkflowType`: `Factibilidad`, `InspeccionParcial`, 
+`InspeccionFinal`
+
+### f1. Generar [POST]
+
+Para comenzar un trámite, se debe invocar por primera vez este servicio,
+enviando los datos de cabecera detallados. El trámite se genera en 
+Status `Borrador`. Se debe generar una entrada en el registro de 
+historial del trámite.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "ProjectId": "345678",
+                "WorkflowType": "Factibilidad"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "WorkflowId": "123456",
+            "Message": "Trámite generado con éxito bajo el nº 123456."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo generar su trámite debido a XXX."
+        }
+
+### **DEPRECADO** f2. Listar [GET]
+
+Este servicio permitirá retornar los datos a mostrar en la vista de
+trámites del matriculado, así como también en el backoffice. Soportará
+los parámetros de filtrado especificados.
+
++ Parameters
+    + BackofficeUserId: `juan.perez` (string, optional) - Username del usuario de backoffice.
+    + UserId: `102030` (string, optional) - ID del usuario.
+    + WorkflowId: `123456` (string, optional) - ID del trámite.
+    + ProjectNumber: `546800001` (string, optional) - Número de proyecto asociado al trámite.
+    + HomeImprovementProject: true (boolean, optional) - Proyecto mejora hogar
+    + OwnerName: `Juan Perez` (string, optional) - Nombre completo del propietario.
+    + OwnerDocumentType: `DNI` (enum[string], optional) - Tipo de documento del propietario.
+        + Members
+            + `CID`
+            + `DNI`
+            + `LCI`
+            + `LEN`
+            + `PSP`
+            + `DNR`
+            + `CUI`
+    + OwnerDocumentNumber: `20123456` (number, optional) - Número de documento del propietario.
+    + OwnerAddress: `Juncal 984` (string, optional) - Domicilio del propietario.
+    + OwnerCity: `Bahía Blanca` (string, optional) - Localidad del propietario.
+    + Status: `EnRevision` (enum[string], optional) - Estado en el que se encuentra el trámite.Valores posibles para `Status`: `Borrador`, `Enviado`, `EnRevision`, 
+        + Members
+            + `Borrador`
+            + `Enviado`
+            + `EnRevision`
+            + `Observado`
+            + `Rechazado`
+            + `EnCurso`
+            + `Completado`
+            + `VisadoSinInspeccion`
+            + `Aprobado`
+            + `Cancelado`
+            + `AprobadoCliente`
+            + `ObservadoCliente`
+    + StatusGroup: `EnCurso` (enum[string], optional) - Grupo de estados en el que se encuentra el trámite. Valores posibles para `StatusGroup`: `EnCurso`, `Completado`.
+        + Members
+            + `EnCurso`
+            + `Completado`
+    
+    + Statuses: `Borrador` (array[enum[string]], optional) - Lista de estados en los que se encuentran los trámites.
+        + Members
+            + `Borrador`
+            + `Enviado`
+            + `EnRevision`
+            + `Observado`
+            + `Rechazado`
+            + `EnCurso`
+            + `Completado`
+            + `VisadoSinInspeccion`
+            + `Aprobado`
+            + `Cancelado`
+            + `AprobadoCliente`
+            + `ObservadoCliente`
+    + MainPipe: true (boolean, optional) - Proyecto con caño mayor.
+    + SupplyPossibility: true (boolean, optional) - Proyecto con posibilidad de suministro.
+    + Page: `1` (integer, optional) - Número de página.
+    + PageSize: `20` (integer, optional) - Tamaño de página.
+    + OrderBy: `Status` (enum[string], optional) - Atributo de ordenamiento.
+        + Members
+            + `Status`
+            + `OwnerAddress`
+            + `OwnerCity`
+            + `OwnerDocumentType`
+            + `OwnerDocumentNumber`
+            + `ProjectNumber`
+            + `OwnerName`
+            + `CreatedAt`
+            + `WorkflowId`
+            + `WorkflowType`
+            + `MainPipe`
+            + `SupplyPossibility`
+    + OrderSort: `asc` (enum[string], optional) - Condición de ordenamiento.
+        + Members
+            + `asc`
+            + `desc`
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Quantity" : "100",
+            "Workflows" : [
+                {
+                    "WorkflowId": 123456,
+                    "UserId": 102030,
+                    "WorkflowType": "Factibilidad",
+                    "Status": "Borrador",
+                    "StatusDescription": "Trámite pendiente de enviar",
+                    "Incomplete": true,
+                    "CreatedAt": "2019-03-29T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                    "WorkflowInitialStepId": "654432",
+                    "ActualWorkflowStepId": "654432",
+                    "Cancellable": true,
+                    "Editable": true,
+                    "Observable": true,
+                    "Approvable": true,
+                    "ClientApprovable": false,
+                    "ClientObservable": false,
+                    "Claimable": false,
+                    "EditableStepIds": ["456433"],
+                    "BackofficeRemarks": null,
+                    "DischargeComment": "Pedido de revisión de trámite",
+                    "LastBackofficeReviewerName": "Luis Oroquieta",
+                    "InspectorName": "Martin Gonzalez",
+                    "ProjectId": 123456
+                },
+                {
+                    "WorkflowId": 563456,
+                    "UserId": 102030,
+                    "WorkflowType": "Factibilidad",
+                    "Status": "Observado",
+                    "StatusDescription": "Trámite observado",
+                    "Incomplete": false,
+                    "CreatedAt": "2019-03-20T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-23T14:10:55-03:00",
+                    "WorkflowInitialStepId": "754432",
+                    "ActualWorkflowStepId": "754432",
+                    "Cancellable": true,
+                    "Editable": true,
+                    "Observable": true,
+                    "Approvable": true,
+                    "ClientApprovable": false,
+                    "ClientObservable": false,
+                    "Claimable": false,
+                    "EditableStepIds": ["456433"],
+                    "BackofficeRemarks": null,
+                    "DischargeComment": null,
+                    "LastBackofficeReviewerName": "Luis Oroquieta",
+                    "InspectorName": "Martin Gonzalez",
+                    "ProjectId": 123456
+                }
+            ]
+        }
+        
++ Response 200
+
+        {
+            "Quantity" : "0",
+            "Workflows" : 
+                [
+                ]
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+        
+## Trámite [/Workflows/{WorkflowId}{?Steps}]
+
+### f3. Mostrar [GET]
+
+Servicio destinado a retornar los datos de cabecera de un trámite
+en específico.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+    + Steps: true (boolean, required) - Flag que indica si se deben enviar los steps del trámite o no.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "WorkflowId": 123456,
+            "UserId": 102030,
+            "ProjectId": 563456,
+            "WorkflowType": "Factibilidad",
+            "Status": "Borrador",
+            "StatusDescription": "Trámite pendiente de enviar",
+            "Incomplete": true,
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "WorkflowInitialStepId": "654432",
+            "ActualWorkflowStepId": "654432",
+            "Cancellable": true,
+            "Editable": true,
+            "Observable": true,
+            "Approvable": true,
+            "ClientApprovable": false,
+            "ClientObservable": false,
+            "Claimable": false,
+            "BackofficeRemarks": null,
+            "DischargeComment": "Pedido de revisión de trámite",
+            "LastBackofficeReviewerName": "Luis Oroquieta",
+            "InspectorName": "Martin Gonzalez",
+            "EditableStepIds": ["654432"],
+            "Steps": [
+                {
+                    "WorkflowStepId": "654432",
+                    "WorkflowId": "123456",
+                    "WorkflowStepCode": "Formulario_3_4_paso_1",
+                    "CreatedAt": "2019-03-29T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                    "Editable": true,
+                    "PreviousWorkflowStepId": null,
+                    "NextWorkflowStepId": null,
+                    "Fields": "{\"CANTIDAD_INSTALACIONES\": \"3\",\"CANTIDAD_TOMAS\": \"5\",\"TIPO_DE_USO\": \"xxxxx\",\"TIPO_DE_PLANO\": \"triangular\",\"CALLE_1\": \"xxxx\",\"CALLE_2\": \"xxxx\",\"CALLE_3\": \"xxxx\",\"CALLE_4\": \"xxxx\",\"DISTANCIA_COTA_A\": \"70\",\"DISTANCIA_COTA_B\": \"50\",\"NUM_VECINO_IZQ\": \"345\",\"NUM_VECINO_DER\": \"12\",\"OBSERVACIONES\": \"xxxxxx\"}",
+                    "BackofficeRemarks": null
+                }
+            ]
+        }
+        
++ Response 200 (application/json)
+
+        {
+            "WorkflowId": "123456",
+            "UserId": "102030",
+            "WorkflowType": "Factibilidad",
+            "Status": "Borrador",
+            "StatusDescription": "Trámite pendiente de enviar",
+            "Incomplete": true,
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "WorkflowInitialStepId": "654432",
+            "ActualWorkflowStepId": "654432",
+            "Cancellable": true,
+            "Editable": true,
+            "Observable": true,
+            "Approvable": true,
+            "ClientApprovable": false,
+            "ClientObservable": false,
+            "Claimable": false,
+            "BackofficeRemarks": null,
+            "DischargeComment": "Pedido de revisión de trámite",
+            "LastBackofficeReviewerName": "Luis Oroquieta",
+            "InspectorName": "Martin Gonzalez"
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+
+        
+### f4. Actualizar [PUT]
+
+Servicio destinado a actualizar los datos de cabecera de un trámite
+en específico.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "UserId": "102030",
+                "BackofficeUserId": null,
+                "BackofficeRemarks": null,
+                "InspectorId": null,
+                "DischargeComment": null,
+                "Status": "EnRevision"
+            }
+
++ Response 200 (application/json)
+
+        {  
+            "Message": "Trámite actualizado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo actualizar el trámite debido a XXX"
+        }
+        
+### f5. Cancelar [DELETE]
+
+Servicio destinado a cancelar un trámite en específico.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+        {  
+            "Message": "Trámite cancelado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo cancelar el trámite debido a XXX"
+        }
+
+
+## Historial de estados de trámite [/Workflows/{WorkflowId}/Historial]
+
+### f6. Obtener [GET]
+
+Servicio destinado a obtener el historial de transiciones de un
+trámite en específico.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+        [
+             {
+                "Order": 1, 
+                "DateTime": "2019-03-29T14:20:55-03:00",
+                "Status": "Borrador",
+                "StatusDescription": "Borrador",
+                "Details": null,
+                "UserName": "Irma Iuquich"
+            },
+            {
+                "Order": 2, 
+                "DateTime": "2019-03-30T14:20:55-03:00",
+                "Status": "Enviado",
+                "StatusDescription": "Enviado",
+                "Details": null,
+                "UserName": "Irma Iuquich",
+                "BackofficeUserName": null
+            },
+            {
+                "Order": 3, 
+                "DateTime": "2019-04-02T14:20:55-03:00",
+                "Status": "EnRevision",
+                "StatusDescription": "En Revision",
+                "Details": null,
+                "UserName": null,
+                "BackofficeUserName": "Juan Perez"
+            },
+            {
+                "Order": 4, 
+                "DateTime": "2019-04-02T14:20:55-03:00",
+                "Status": "Observado",
+                "StatusDescription": "Observado",
+                "Details": "Faltó definir altura de la calle",
+                "UserName": null,
+                "BackofficeUserName": "Juan Perez"
+            }
+        ]
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+        
+## Listado de Steps de trámite [/Workflows/{WorkflowId}/Steps]
+        
+### f7. Generar [POST]
+
+Una vez que el trámite ya está iniciado, se consume este servicio
+para guardar la información de cada paso del mismo que el usuario
+va completando. 
+
+En caso que se trate del primer paso del trámite, se deben actualizar
+los campos `WorkflowInitialStepId` y `ActualWorkflowStepId` del trámite
+con el ID de paso de trámite generado en esta acción.
+
+En caso que **NO** se trate del primer paso del trámite, se deben 
+actualizar los campos `ActualWorkflowStepId` del trámite y 
+`NextWorkflowStepId` del paso actual apuntando al ID de paso de 
+trámite generado en esta acción. Además debe actualizarse el campo
+`PreviousWorkflowStepId` del nuevo paso generado con el valor que
+contenía `ActualWorkflowStepId` del trámite.
+
+Por último de debe generar una entrada en el registro de historial
+de trámites si corresponde.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "WorkflowStepCode": "Formulario_3_4_paso_1",
+                "Fields": "{\"CANTIDAD_INSTALACIONES\": \"3\",\"CANTIDAD_TOMAS\": \"5\",\"TIPO_DE_USO\": \"xxxxx\",\"TIPO_DE_PLANO\": \"triangular\",\"CALLE_1\": \"xxxx\",\"CALLE_2\": \"xxxx\",\"CALLE_3\": \"xxxx\",\"CALLE_4\": \"xxxx\",\"DISTANCIA_COTA_A\": \"70\",\"DISTANCIA_COTA_B\": \"50\",\"NUM_VECINO_IZQ\": \"345\",\"NUM_VECINO_DER\": \"12\",\"OBSERVACIONES\": \"xxxxxx\"}"
+            }
+
++ Response 200 (application/json)
+
+        {  
+            "Message": "Trámite actualizado correctamente.",
+            "WorkflowStepId": "654432"
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+
+## Paso de trámite [/Workflows/{WorkflowId}/Steps/{WorkflowStepId}]
+
+### f8. Mostrar [GET]
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+    + WorkflowStepId: `654432` (string, required) - ID del paso del trámite.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "WorkflowStepId": "654432",
+            "WorkflowId": "123456",
+            "WorkflowStepCode": "Formulario_3_4_paso_1",
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "Editable": true,
+            "PreviousWorkflowStepId": null,
+            "NextWorkflowStepId": null,
+            "Fields": "{\"CANTIDAD_INSTALACIONES\": \"3\",\"CANTIDAD_TOMAS\": \"5\",\"TIPO_DE_USO\": \"xxxxx\",\"TIPO_DE_PLANO\": \"triangular\",\"CALLE_1\": \"xxxx\",\"CALLE_2\": \"xxxx\",\"CALLE_3\": \"xxxx\",\"CALLE_4\": \"xxxx\",\"DISTANCIA_COTA_A\": \"70\",\"DISTANCIA_COTA_B\": \"50\",\"NUM_VECINO_IZQ\": \"345\",\"NUM_VECINO_DER\": \"12\",\"OBSERVACIONES\": \"xxxxxx\"}",
+            "BackofficeRemarks": null
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Paso de trámite inexistente."
+        }
+        
+### f9. Actualizar [PUT]
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+    + WorkflowStepId: `654432` (string, required) - ID del paso del trámite.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "WorkflowStepId": "654432",
+                "WorkflowId": "123456",
+                "WorkflowStepCode": "Formulario_3_4_paso_1",
+                "CreatedAt": "2019-03-29T14:20:55-03:00",
+                "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                "Editable": true,
+                "PreviousWorkflowStepId": null,
+                "NextWorkflowStepId": null,                
+                "Fields": "{\"CANTIDAD_INSTALACIONES\": \"3\",\"CANTIDAD_TOMAS\": \"5\",\"TIPO_DE_USO\": \"xxxxx\",\"TIPO_DE_PLANO\": \"triangular\",\"CALLE_1\": \"xxxx\",\"CALLE_2\": \"xxxx\",\"CALLE_3\": \"xxxx\",\"CALLE_4\": \"xxxx\",\"DISTANCIA_COTA_A\": \"70\",\"DISTANCIA_COTA_B\": \"50\",\"NUM_VECINO_IZQ\": \"345\",\"NUM_VECINO_DER\": \"12\",\"OBSERVACIONES\": \"xxxxxx\"}",
+                "BackofficeRemarks": null
+            }
+            
++ Response 200 (application/json)
+
+        {
+            "Message": "Paso de trámite actualizado correctamente."
+        }
+            
++ Response 404 (application/json)
+
+        {
+            "Message": "Paso de trámite inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo actualizar el trámite debido a XXX"
+        }
+        
+## Tramites de Oficina Virtual [/Workflows/VirtualOffice{?documentNumber,documentType}]
+
+### **DEPRECADO** f10. Listar [GET]
+
+Este endpoint permite recuperar un listado de tramites filtrando únicamente 
+por número y tipo del documento del propietario asociado al trámite.
+
++ Parameters
+    + documentNumber: '12345678' (string, required) - Número de documento del propietario asociado al trámite.
+    + documentType: DNI (enum[string], required) - Tipo de documento del propietario asociado al trámite.
+        + Members
+            + `DNI`
+            + `LI`
+            + `LE`
+            + `CUIT`
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "WorkflowId": "123456",
+                "UserId": "102030",
+                "WorkflowType": "Formulario_3_4",
+                "ProjectNumber": 546800001,
+                "Status": "Borrador",
+                "StatusDescription": "Trámite pendiente de enviar",
+                "Incomplete": true,
+                "CreatedAt": "2019-03-29T14:20:55-03:00",
+                "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                "WorkflowInitialStepId": "654432",
+                "ActualWorkflowStepId": "654432",
+                "Cancellable": true,
+                "Editable": true,
+                "Observable": true,
+                "Approvable": true,
+                "ClientApprovable": false,
+                "ClientObservable": false,
+                "Claimable": false,
+                "EditableHeaderData": true,
+                "EditableStepIds": ["456433"],
+                "BackofficeRemarks": null,
+                "DischargeComment": "Pedido de revisión de trámite",
+                "LastBackofficeReviewerName": "Luis Oroquieta",
+                "InspectorName": "Martin Gonzalez",
+                "HeaderData": {
+                    "WorkflowType": "Nuevo",
+                    "OwnerCuit": null,
+                    "OwnerFirstName": "Juan",
+                    "OwnerLastName": "Perez",
+                    "OwnerDocumentType": "DNI",
+                    "OwnerDocumentNumber": "23567897",
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerCity": "001",
+                    "OwnerBetweenStreet1": "Belgrano",
+                    "OwnerBetweenStreet2": "Larrea",
+                    "HomeImprovementProject": false,
+                    "MainPipe": true,
+                    "SupplyPossibility": true,
+                    "OwnerPhone": {
+                        "OwnerPhoneAreaCode": "11",
+                        "OwnerPhoneNumber": "45675788"
+                    },
+                    "OwnerPhoneType": "CELULAR",
+                    "OwnerEmail": "juan_perez@example.com"
+                }
+            },
+            {
+                "WorkflowId": "563456",
+                "UserId": "102030",
+                "WorkflowType": "Formulario_3_4",
+                "ProjectNumber": 546800002,
+                "Status": "Observado",
+                "StatusDescription": "Trámite observado",
+                "Incomplete": false,
+                "CreatedAt": "2019-03-20T14:20:55-03:00",
+                "UpdatedAt": "2019-03-23T14:10:55-03:00",
+                "WorkflowInitialStepId": "754432",
+                "ActualWorkflowStepId": "754432",
+                "Cancellable": true,
+                "Editable": true,
+                "Observable": true,
+                "Approvable": true,
+                "EditableHeaderData": true,
+                "Claimable": false,
+                "EditableStepIds": ["656431"],
+                "BackofficeRemarks": null,
+                "DischargeComment": "Pedido de revisión de trámite",
+                "LastBackofficeReviewerName": "Luis Oroquieta",
+                "InspectorName": "Martin Gonzalez",
+                "HeaderData": {
+                    "WorkflowType": "Nuevo",
+                    "OwnerCuit": null,
+                    "OwnerFirstName": "Juan",
+                    "OwnerLastName": "Perez",
+                    "OwnerDocumentType": "DNI",
+                    "OwnerDocumentNumber": "23567897",
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerCity": "001",
+                    "OwnerBetweenStreet1": null,
+                    "OwnerBetweenStreet2": null,
+                    "HomeImprovementProject": false,
+                    "MainPipe": true,
+                    "SupplyPossibility": true,
+                    "OwnerPhone": {
+                        "OwnerPhoneAreaCode": "11",
+                        "OwnerPhoneNumber": "45675788"
+                    },
+                    "OwnerPhoneType": "CELULAR",
+                    "OwnerEmail": "juan_perez@example.com"
+                }
+            }
+        ]
+        
++ Response 200
+
+        [
+        ]
+
++ Response 400 (application/json)
+
+        {
+            "Message": "Value LENE not defined in EDocumentType."
+        }
+
+## Notificaciones de Trámite [/Workflows/{WorkflowId}/Notifications]
+
+### f11. Generar [POST]
+
+Servicio destinado a notificaciones asociadas a un trámite en particular.
+
+Valores posibles para `NotificationType`: `Visita`
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "NotificationType": "Visita",
+                "NotifyUser": true,
+                "NotifyOwner": false,
+                "Date": "2020-02-01",
+                "StartTime": "09:00",
+                "EndTime": "11:00",
+                "Message": "Recordar tener el plano a disposición para la visita."
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Las notificaciones fueron enviadas con éxito."
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+
+
+## Reservar tiempo de edición de Trámite [/Workflows/{WorkflowId}/Block]
+
+### f12. Tomar un Trámite [PUT]
+
+Servicio destinado a reservar un trámite para que solo un Backoffice User lo pueda editar
+por un tiempo determinado.
+
++ Parameters
+    + WorkflowId: `123456` (string, required) - ID del trámite.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "BackofficeUserId": "juan.perez"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "Trámite reservado."
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Trámite inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "Trámite ya reservado."
+        }
+
+
+# Group g. Autenticación de Usuarios Backoffice
+
+## Login [/BackofficeUsers/Login]
+
+Cuando un usuario backoffice quiere loguearse a la plataforma, sus 
+credenciales (`Username` y `Password`) son validadas para verificar 
+su autenticidad. Se retorna el identificador unívoco del usuario.
+
+### g1. Ingresar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "Username": "juan.perez",
+                "Password": "12345678aA"
+            }
+
++ Response 200 (application/json)
+
+        {
+            "BackofficeUserId": "juan.perez",
+            "Email": "juan_perez@example.com"
+        }
+        
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+    
+    + Body
+
+            {
+                "Username": "juan.perez",
+                "Password": "abcdefg"
+            }
+
++ Response 401 (application/json)
+
+        {
+            "Message": "Credenciales inválidas"
+        }
+
+
+# Group h. Usuarios Backoffice
+
+## Perfil [/BackofficeUsers{?Username}]
+
+Gestión de los datos de perfil del usuario backoffice.
+
+### h1. Mostrar [GET]
+
++ Parameters
+    + Username: `juan.perez` (string, required) - Username del Usuario Backoffice.
+    
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+        {
+            "Username": "jperez",
+            "Email": "juan_perez@example.com",
+            "Name": "JUAN",
+            "LastName": "PEREZ"
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+# Group i. Pagos
+## Pago [/Payments]
+
+Gestión de pagos y listado histórico asociado a una Cuenta.
+
+### k1. Pagar [POST]
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+            
+    + Body
+
+            {
+                "Token": "dsalfl3-234dfsjljnasdj",
+                "PaymentMethod": "Visa",
+                "Bin": "453456",
+                "LastFourDigits": "0567",
+                "TotalAmount": 400.50
+            }
+
++ Response 200 (application/json)
+
+        {
+            "Message": "El pago fue realizado con éxito. La información puede tardar en reflejarse hasta 24hs."
+        }
+
++ Response 422 (application/json)
+
+        {
+            "Error": "Tarjeta inválida"
+        }
+
+# Group j. Callejero AG
+
+## Localidades [/GeographicInformation/Cities]
+
+### j1. Obtener  [GET]
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "Name": "La Plata",
+                "Value": 1
+            }, {
+                "Name": "Ensenada",
+                "Value": 2
+            }
+        ]
+
+## Calles por localidad [/GeographicInformation/Cities/{CityId}/Streets]
+
+### j2. Obtener  [GET]
+
++ Parameters
+    + CityId: `001` (string, required) - ID de la localidad.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "CityId": 1,
+                "StreetType": "Avenida",
+                "Street": "Olazabal",
+                "StreetNumberFrom": 2000,
+                "StreetNumberTo": 9000
+            },
+            {
+                "CityId": 1,
+                "StreetType": "Calle",
+                "Street": "Conde",
+                "StreetNumberFrom": 0,
+                "StreetNumberTo": 1000
+            }
+        ]
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Localidad inexistente."
+        }
+
+## Edificios [/GeographicInformation/Buildings]
+
+### j3. Obtener  [GET]
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Floors": ["PB", "1", "2"],
+            "Apartments": ["1", "2", "A", "B"],
+            "Towers": ["A", "B", "C"]
+        }
+    
+## Plancheta [/GeographicInformation/Cities/{CityId}/Planchette{?Street,StreetNumber}]
+
+### j4. Obtener  [GET]
+
++ Parameters
+    + CityId: `1` (number, required) - ID de Localidad.
+    + Street: `Belgrano` (string, required) - Calle.
+    + StreetNumber: `123` (number, required) - Número de Calle.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "Planchette": 40,
+                "Annex": "B",
+                "Issuer": 70002,
+                "Project": "6119/98",
+                "StreetNumberFrom": 100,
+                "StreetNumberTo": 200,
+                "Sidewalk": "P"
+            },
+            {
+                "Planchette": 20,
+                "Annex": "",
+                "Issuer": 70002,
+                "Project": "MC LPL AÑO93",
+                "StreetNumberFrom": 300,
+                "StreetNumberTo": 400,
+                "Sidewalk": "I"
+            }
+        ]
+        
++ Response 200 (application/json)
+
+        [
+        ]
+
+# Group k. Descarga de Documentos
+
+## Descargas [/FileDownloads/{FileId}]
+
+### k1. Obtener  [GET]
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Archivo inexistente."
+        }
+
+# Group l. Proyectos
+
+## Listado de proyectos [/Projects{?BackofficeUserId,UserId,ProjectId,ProjectType,ProjectNumber,HomeImprovementProject,OwnerName,OwnerDocumentType,OwnerDocumentNumber,OwnerAddress,OwnerCity,Status,Statuses,MainPipe,SupplyPossibility,Page,PageSize,OrderBy,OrderSort}]
+
+Alta y listado de proyectos asociados a un usuario.
+
+Valores posibles para `Status`: `Nuevo`, `Abierto`, `FactibilidadEnviada`, 
+`FactibilidadAprobadaPorCliente`,`FactibilidadEnRevision`, `FactibilidadObservada`, 
+`FactibilidadAprobada`, `InspeccionParcialEnCurso`, `InspeccionFinalEnCurso`, `Cerrado`,
+`Cancelado`
+
+Valores posibles para `ProjectType`: `Nuevo`, `Ampliacion`, `Modificacion`
+
+### l1. Generar [POST]
+
+Para comenzar un proyecto, se debe invocar por primera vez este servicio,
+enviando los datos de cabecera detallados. El proyecto se genera en 
+Status `Nuevo`. Se debe generar una entrada en el registro de 
+historial del proyecto.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "UserId": "102030",
+                "HeaderData": {
+                    "AGAccountId": "003467754",
+                    "ProjectType": "Ampliacion",
+                    "HomeImprovementProject": false,
+                    "OwnerCuit": null
+                }
+            }
+
++ Response 200 (application/json)
+
+        {
+            "ProjectId": "123456",
+            "ProjectNumberAG": "4568765",
+            "UserId": "102030",
+            "Status": "Nuevo",
+            "StatusDescription": "Nuevo",
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "Incomplete": true,
+            "Cancellable": true,
+            "Editable": true,
+            "HeaderData": {
+                "ProjectType": "Ampliacion",
+                "HomeImprovementProject": false,
+                "OwnerCuit": null,
+                "OwnerFirstName": "Juan",
+                "OwnerLastName": "Perez",
+                "OwnerDocumentType": "DNI",
+                "OwnerDocumentNumber": "23567897",
+                "OwnerStreet": "Juncal",
+                "OwnerStreetNumber": "984",
+                "OwnerFloor": "2",
+                "OwnerApartment": "A",
+                "OwnerTower": "Golf",
+                "OwnerCity": "001",
+                "OwnerBetweenStreet1": "Belgrano",
+                "OwnerBetweenStreet2": "Larrea",
+                "MainPipe": true,
+                "SupplyPossibility": true,
+                "OwnerPhone": {
+                    "OwnerPhoneAreaCode": "11",
+                    "OwnerPhoneNumber": "45675788"
+                },
+                "OwnerPhoneType": "CELULAR",
+                "OwnerEmail": "juan_perez@example.com"
+            }
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "El número de cuenta ingresado no existe."
+        }
+        
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "UserId": "102030",
+                "HeaderData": {
+                    "ProjectType": "Nuevo",
+                    "HomeImprovementProject": true,
+                    "OwnerCuit": "233456783459",
+                    "AGAccountId": null
+                }
+            }
+
++ Response 200 (application/json)
+
+        {
+            "ProjectId": "123456",
+            "ProjectNumberAG": "4568765",
+            "UserId": "102030",
+            "Status": "Nuevo",
+            "StatusDescription": "Nuevo",
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "Incomplete": true,
+            "Cancellable": true,
+            "Editable": true,
+            "HeaderData": {
+                "ProjectType": "Nuevo",
+                "HomeImprovementProject": true,
+                "OwnerCuit": "233456783459",
+                "OwnerFirstName": null,
+                "OwnerLastName": null,
+                "OwnerDocumentType": null,
+                "OwnerDocumentNumber": null,
+                "OwnerStreet": null,
+                "OwnerStreetNumber": null,
+                "OwnerFloor": null,
+                "OwnerApartment": null,
+                "OwnerTower": null,
+                "OwnerCity": null,
+                "OwnerBetweenStreet1": null,
+                "OwnerBetweenStreet2": null,
+                "MainPipe": null,
+                "SupplyPossibility": null,
+                "OwnerPhone": {
+                    "OwnerPhoneAreaCode": null,
+                    "OwnerPhoneNumber": null
+                },
+                "OwnerPhoneType": null,
+                "OwnerEmail": null
+            }
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "El propietario no es beneficiario del plan Mejor Hogar."
+        }
+        
+### l2. Listar [GET]
+
+Este servicio permitirá retornar los datos a mostrar en la vista de
+proyectos del matriculado, así como también en el backoffice. Soportará
+los parámetros de filtrado especificados.
+
++ Parameters
+    + BackofficeUserId: `juan.perez` (string, optional) - Username del usuario de backoffice.
+    + UserId: `102030` (string, optional) - ID del usuario.
+    + ProjectNumber: `546800001` (string, optional) - Número de proyecto.
+    + HomeImprovementProject: true (boolean, optional) - Proyecto mejora hogar.
+    + OwnerName: `Juan Perez` (string, optional) - Nombre completo del propietario.
+    + OwnerDocumentType: `DNI` (enum[string], optional) - Tipo de documento del propietario.
+        + Members
+            + `CID`
+            + `DNI`
+            + `LCI`
+            + `LEN`
+            + `PSP`
+            + `DNR`
+            + `CUI`
+    + OwnerDocumentNumber: `20123456` (number, optional) - Número de documento del propietario.
+    + OwnerAddress: `Juncal 984` (string, optional) - Domicilio del propietario.
+    + OwnerCity: `Bahía Blanca` (string, optional) - Localidad del propietario.
+    + Status: `Abierto` (enum[string], optional) - Estado en el que se encuentra el proyecto. Valores posibles para `Status`: `Nuevo`, `Abierto`, `FactibilidadObservada`, 
+`FactibilidadAprobada`, `InspeccionParcialEnCurso`, `InspeccionFinalEnCurso`, `Cerrado`
+        + Members
+            + `Nuevo`
+            + `Abierto`
+            + `FactibilidadObservada`
+            + `FactibilidadAprobada`
+            + `InspeccionParcialEnCurso`
+            + `InspeccionFinalEnCurso`
+            + `Cerrado`
+    + Statuses: `Nuevo` (array[enum[string]], optional) - Lista de estados en los que se encuentran los proyectos.
+        + Members
+            + `Nuevo`
+            + `Abierto`
+            + `FactibilidadObservada`
+            + `FactibilidadAprobada`
+            + `InspeccionParcialEnCurso`
+            + `InspeccionFinalEnCurso`
+            + `Cerrado`
+    + MainPipe: true (boolean, optional) - Proyecto con caño mayor.
+    + SupplyPossibility: true (boolean, optional) - Proyecto con posibilidad de suministro.
+    + Page: `1` (integer, optional) - Número de página.
+    + PageSize: `20` (integer, optional) - Tamaño de página.
+    + OrderBy: `Status` (enum[string], optional) - Atributo de ordenamiento.
+        + Members
+            + `Status`
+            + `OwnerAddress`
+            + `OwnerCity`
+            + `OwnerDocumentType`
+            + `OwnerDocumentNumber`
+            + `ProjectNumber`
+            + `OwnerName`
+            + `CreatedAt`
+            + `MainPipe`
+            + `SupplyPossibility`
+    + OrderSort: `asc` (enum[string], optional) - Condición de ordenamiento.
+        + Members
+            + `asc`
+            + `desc`
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Quantity" : "100",
+            "Projects" : [
+                {
+                    "ProjectId": "123456",
+                    "ProjectNumberAG": "4568765",
+                    "UserId": "102030",
+                    "Status": "Nuevo",
+                    "StatusDescription": "Nuevo",
+                    "CreatedAt": "2019-03-29T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                    "Incomplete": true,
+                    "Cancellable": true,
+                    "Editable": true,
+                    "HeaderData": {
+                        "ProjectType": "Ampliacion",
+                        "HomeImprovementProject": false,
+                        "OwnerCuit": null,
+                        "OwnerFirstName": "Juan",
+                        "OwnerLastName": "Perez",
+                        "OwnerDocumentType": "DNI",
+                        "OwnerDocumentNumber": "23567897",
+                        "OwnerStreet": "Juncal",
+                        "OwnerStreetNumber": "984",
+                        "OwnerFloor": "2",
+                        "OwnerApartment": "A",
+                        "OwnerTower": "Golf",
+                        "OwnerCity": "001",
+                        "OwnerBetweenStreet1": "Belgrano",
+                        "OwnerBetweenStreet2": "Larrea",
+                        "MainPipe": true,
+                        "SupplyPossibility": true,
+                        "OwnerPhone": {
+                            "OwnerPhoneAreaCode": "11",
+                            "OwnerPhoneNumber": "45675788"
+                        },
+                        "OwnerPhoneType": "CELULAR",
+                        "OwnerEmail": "juan_perez@example.com"
+                    }
+                },
+                {
+                    "ProjectId": "420420",
+                    "ProjectNumberAG": "4568786",
+                    "UserId": "102030",
+                    "Status": "Nuevo",
+                    "StatusDescription": "Nuevo",
+                    "CreatedAt": "2019-03-29T15:20:55-03:00",
+                    "UpdatedAt": "2019-03-30T15:40:55-03:00",
+                    "Incomplete": true,
+                    "Cancellable": true,
+                    "Editable": true,
+                    "HeaderData": {
+                        "ProjectType": "Ampliacion",
+                        "HomeImprovementProject": false,
+                        "OwnerCuit": null,
+                        "OwnerFirstName": "Juan",
+                        "OwnerLastName": "Perez",
+                        "OwnerDocumentType": "DNI",
+                        "OwnerDocumentNumber": "23567897",
+                        "OwnerStreet": "Juncal",
+                        "OwnerStreetNumber": "984",
+                        "OwnerFloor": "2",
+                        "OwnerApartment": "A",
+                        "OwnerTower": "Golf",
+                        "OwnerCity": "001",
+                        "OwnerBetweenStreet1": "Belgrano",
+                        "OwnerBetweenStreet2": "Larrea",
+                        "MainPipe": true,
+                        "SupplyPossibility": true,
+                        "OwnerPhone": {
+                            "OwnerPhoneAreaCode": "11",
+                            "OwnerPhoneNumber": "45675788"
+                        },
+                        "OwnerPhoneType": "CELULAR",
+                        "OwnerEmail": "juan_perez@example.com"
+                    }
+                }
+            ]
+        }
+        
++ Response 200
+
+        {
+            "Quantity" : "0",
+            "Projects" : 
+                [
+                ]
+        }
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Usuario inexistente."
+        }
+
+## Proyecto [/Projects/{ProjectId}]
+
+### l3. Obtener  [GET]
+    Servicio destinado a retornar los datos de un proyecto
+    en específico.
+    
++ Parameters
+    + ProjectId: `123456` (string, required) - ID del proyecto.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "ProjectId": 123456,
+            "ProjectNumberAG": 4568765,
+            "UserId": 102030,
+            "Status": "Nuevo",
+            "StatusDescription": "Nuevo",
+            "CreatedAt": "2019-03-29T14:20:55-03:00",
+            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+            "Incomplete": true,
+            "Cancellable": true,
+            "Editable": true,
+            "HeaderData": {
+                "ProjectType": "Ampliacion",
+                "HomeImprovementProject": false,
+                "OwnerCuit": null,
+                "OwnerFirstName": "Juan",
+                "OwnerLastName": "Perez",
+                "OwnerDocumentType": "DNI",
+                "OwnerDocumentNumber": "23567897",
+                "OwnerStreet": "Juncal",
+                "OwnerStreetNumber": "984",
+                "OwnerFloor": "2",
+                "OwnerApartment": "A",
+                "OwnerTower": "Golf",
+                "OwnerCity": "001",
+                "OwnerBetweenStreet1": "Belgrano",
+                "OwnerBetweenStreet2": "Larrea",
+                "MainPipe": true,
+                "SupplyPossibility": true,
+                "OwnerPhone": {
+                    "OwnerPhoneAreaCode": "11",
+                    "OwnerPhoneNumber": "45675788"
+                },
+                "OwnerPhoneType": "CELULAR",
+                "OwnerEmail": "juan_perez@example.com"
+            },
+            "Workflows": [
+                {
+                    "WorkflowId": 123456,
+                    "ProjectId": 123456,
+                    "WorkflowType": "Factibilidad",
+                    "Status": "Borrador",
+                    "StatusDescription": "Trámite pendiente de enviar",
+                    "Incomplete": true,
+                    "CreatedAt": "2019-03-29T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                    "WorkflowInitialStepId": "654432",
+                    "ActualWorkflowStepId": "654432",
+                    "Cancellable": true,
+                    "Editable": true,
+                    "Observable": true,
+                    "Approvable": true,
+                    "ClientApprovable": false,
+                    "ClientObservable": false,
+                    "Claimable": false,
+                    "BackofficeRemarks": null,
+                    "DischargeComment": "Pedido de revisión de trámite",
+                    "LastBackofficeReviewerName": "Luis Oroquieta",
+                    "Steps": [
+                        {
+                            "WorkflowStepId": 654432,
+                            "WorkflowId": 123456,
+                            "WorkflowStepCode": "Formulario_3_4_paso_1",
+                            "CreatedAt": "2019-03-29T14:20:55-03:00",
+                            "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                            "Editable": true,
+                            "PreviousWorkflowStepId": null,
+                            "NextWorkflowStepId": null,
+                            "Fields": "{\"CANTIDAD_INSTALACIONES\": \"3\",\"CANTIDAD_TOMAS\": \"5\",\"TIPO_DE_USO\": \"xxxxx\",\"TIPO_DE_PLANO\": \"triangular\",\"CALLE_1\": \"xxxx\",\"CALLE_2\": \"xxxx\",\"CALLE_3\": \"xxxx\",\"CALLE_4\": \"xxxx\",\"DISTANCIA_COTA_A\": \"70\",\"DISTANCIA_COTA_B\": \"50\",\"NUM_VECINO_IZQ\": \"345\",\"NUM_VECINO_DER\": \"12\",\"OBSERVACIONES\": \"xxxxxx\"}",
+                            "BackofficeRemarks": null
+                        }
+                    ]
+                },
+                {
+                    "WorkflowId": 563456,
+                    "WorkflowType": "Factibilidad",
+                    "Status": "Observado",
+                    "StatusDescription": "Trámite observado",
+                    "Incomplete": false,
+                    "CreatedAt": "2019-03-20T14:20:55-03:00",
+                    "UpdatedAt": "2019-03-23T14:10:55-03:00",
+                    "WorkflowInitialStepId": "754432",
+                    "ActualWorkflowStepId": "754432",
+                    "Cancellable": true,
+                    "Editable": true,
+                    "Observable": true,
+                    "Approvable": true,
+                    "ClientApprovable": false,
+                    "ClientObservable": false,
+                    "Claimable": false,
+                    "LastBackofficeReviewerName": "Luis Oroquieta",
+                    "BackofficeRemarks": null,
+                    "DischargeComment": null,
+                    "ProjectId": "123456",
+                    "Steps": []
+                }
+            ]
+        }
+           
+
++ Response 404 (application/json)
+
+        {
+            "Message": "Proyecto inexistente."
+        }
+
+### l4. Actualizar [PUT]
+
+Servicio destinado a actualizar los datos de un proyecto
+en específico.
+
++ Parameters
+    + ProjectId: `123456` (string, required) - ID del proyecto.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: JWT
+
+    + Body
+
+            {
+                "HeaderData": {
+                    "AGAccountId": null,
+                    "ProjectType": "Nuevo",
+                    "HomeImprovementProject": false,
+                    "OwnerCuit": null,
+                    "OwnerCity": "Bahía Blanca",
+                    "OwnerFirstName": "Juan",
+                    "OwnerLastName": "Perez",
+                    "OwnerAddress" : "Juncal 984",
+                    "OwnerDocumentNumber": "23567897",
+                    "OwnerDocumentType": "DNI",
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerCity": "001",
+                    "OwnerBetweenStreet1": "Belgrano",
+                    "OwnerBetweenStreet2": "Larrea",
+                    "MainPipe": true,
+                    "SupplyPossibility": true,
+                    "OwnerPhone": {
+                        "OwnerPhoneAreaCode": "11",
+                        "OwnerPhoneNumber": "45675788"
+                    },
+                    "OwnerPhoneType": "CELULAR",
+                    "OwnerEmail": "juan_perez@example.com"
+                }
+            }
+
++ Response 200 (application/json)
+
+        {  
+            "Message": "Proyecto actualizado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Proyecto inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo actualizar el proyecto debido a XXX"
+        }
+        
+### l5. Cancelar [DELETE]
+
+Servicio destinado a cancelar un proyecto en específico.
+
++ Parameters
+    + ProjectId: `123456` (string, required) - ID del proyecto.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+        {  
+            "Message": "Proyecto cancelado correctamente."
+        }
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Proyecto inexistente."
+        }
+        
++ Response 422 (application/json)
+
+        {
+            "Message": "No se pudo cancelar el proyecto debido a XXX"
+        }
+
+## Historial de estados de proyecto [/Projects/{ProjectId}/Historial]
+
+### l6. Obtener [GET]
+
+Servicio destinado a obtener el historial de transiciones de un
+proyecto en específico.
+
++ Parameters
+    + ProjectId: `123456` (string, required) - ID del proyecto.
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+            
++ Response 200 (application/json)
+
+
+        [
+             {
+                "Order": 1, 
+                "DateTime": "2019-03-29T14:20:55-03:00",
+                "Status": "Abierto",
+                "StatusDescription": "Abierto",
+                "Details": null,
+                "UserName": "Irma Iuquich"
+            },
+            {
+                "Order": 2, 
+                "DateTime": "2019-03-30T14:20:55-03:00",
+                "Status": "En curso",
+                "StatusDescription": "En curso",
+                "Details": null,
+                "UserName": "Irma Iuquich",
+                "BackofficeUserName": null
+            },
+            {
+                "Order": 3, 
+                "DateTime": "2019-04-02T14:20:55-03:00",
+                "Status": "Inspección parcial en curso",
+                "StatusDescription": "Inspección parcial en curso",
+                "Details": null,
+                "UserName": null,
+                "BackofficeUserName": "Juan Perez"
+            },
+            {
+                "Order": 4, 
+                "DateTime": "2019-04-02T14:20:55-03:00",
+                "Status": "Rechazado",
+                "StatusDescription": "Rechazado",
+                "Details": "Faltó definir altura de la calle",
+                "UserName": null,
+                "BackofficeUserName": "Juan Perez"
+            }
+        ]
+        
++ Response 404 (application/json)
+
+        {
+            "Message": "Proyecto inexistente."
+        }
+        
+## Proyectos de Oficina Virtual [/Projects/VirtualOffice{?documentNumber,documentType}]
+
+### l7. Listar [GET]
+
+Este endpoint permite recuperar un listado de proyectos filtrando únicamente 
+por número y tipo del documento del propietario asociado al proyecto.
+
++ Parameters
+    + documentNumber: '12345678' (string, required) - Número de documento del propietario asociado al proyecto.
+    + documentType: DNI (enum[string], required) - Tipo de documento del propietario asociado al proyecto.
+        + Members
+            + `DNI`
+            + `LI`
+            + `LE`
+            + `CUIT`
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "ProjectId": "123456",
+                "ProjectNumberAG": "4568765",
+                "UserId": "102030",
+                "Status": "Nuevo",
+                "StatusDescription": "Nuevo",
+                "CreatedAt": "2019-03-29T14:20:55-03:00",
+                "UpdatedAt": "2019-03-30T14:10:55-03:00",
+                "HeaderData": {
+                    "ProjectType": "Ampliacion",
+                    "HomeImprovementProject": false,
+                    "OwnerCuit": null,
+                    "OwnerFirstName": "Juan",
+                    "OwnerLastName": "Perez",
+                    "OwnerDocumentType": "DNI",
+                    "OwnerDocumentNumber": "23567897",
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerCity": "001",
+                    "OwnerBetweenStreet1": "Belgrano",
+                    "OwnerBetweenStreet2": "Larrea",
+                    "MainPipe": true,
+                    "SupplyPossibility": true,
+                    "OwnerPhone": {
+                        "OwnerPhoneAreaCode": "11",
+                        "OwnerPhoneNumber": "45675788"
+                    },
+                    "OwnerPhoneType": "CELULAR",
+                    "OwnerEmail": "juan_perez@example.com"
+                }
+            },
+            {
+                "ProjectId": "420420",
+                "ProjectNumberAG": "4568786",
+                "UserId": "102030",
+                "Status": "Nuevo",
+                "StatusDescription": "Nuevo",
+                "CreatedAt": "2019-03-29T15:20:55-03:00",
+                "UpdatedAt": "2019-03-30T15:40:55-03:00",
+                "HeaderData": {
+                    "ProjectType": "Ampliacion",
+                    "HomeImprovementProject": false,
+                    "OwnerCuit": null,
+                    "OwnerFirstName": "Juan",
+                    "OwnerLastName": "Perez",
+                    "OwnerDocumentType": "DNI",
+                    "OwnerDocumentNumber": "23567897",
+                    "OwnerStreet": "Juncal",
+                    "OwnerStreetNumber": "984",
+                    "OwnerFloor": "2",
+                    "OwnerApartment": "A",
+                    "OwnerTower": "Golf",
+                    "OwnerCity": "001",
+                    "OwnerBetweenStreet1": "Belgrano",
+                    "OwnerBetweenStreet2": "Larrea",
+                    "MainPipe": true,
+                    "SupplyPossibility": true,
+                    "OwnerPhone": {
+                        "OwnerPhoneAreaCode": "11",
+                        "OwnerPhoneNumber": "45675788"
+                    },
+                    "OwnerPhoneType": "CELULAR",
+                    "OwnerEmail": "juan_perez@example.com"
+                }
+            }
+        ]
+        
++ Response 200
+
+        [
+        ]
+
++ Response 400 (application/json)
+
+        {
+            "Message": "Value LENE not defined in EDocumentType."
+        }
+        
+# Group m. Inspectores
+
+## Inspectores [/Inspectors]
+
+### m1. Listar  [GET]
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        [
+            {
+                "Name": "Martin Gonzalez",
+                "Value": 1
+            },
+            
+            {
+                "Name": "Damian Perez",
+                "Value": 2
+            }
+        ]
+# Group z. Configuración
+
+## Health Check [/HealthCheck]
+
+Servicio destinado a verificar la disponibilidad de la API.
+
+### z1. Obtener [GET]
+
++ Response 200 (application/json)
+
+        {
+            "Version": "1.0",
+            "Success": true
+        }
+        
++ Response 500
+        
+## Parámetros [/Configuration]
+
+Servicio destinado a obtener parámetros de configuración de la plataforma.
+
+### z2. Obtener [GET]
+
++ Request
+
+    + Headers
+
+            Authorization: JWT
+
++ Response 200 (application/json)
+
+        {
+            "Cities": [
+                {
+                    "Name": "La Plata",
+                    "Value": 1,
+                    "Order": 1
+                }, {
+                    "Name": "Ensenada",
+                    "Value": 2,
+                    "Order": 2
+                }
+            ]
+        }
